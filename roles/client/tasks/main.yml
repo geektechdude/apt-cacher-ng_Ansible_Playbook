@@ -1,0 +1,21 @@
+---
+- name: Include variables
+  include_vars:
+    file: ../../vars.yml
+
+- name: Copy Yum Configuration (CentOS)
+  become: yes
+  copy:
+    src: /etc/yum.conf
+    dest: /etc/original.yumconf_file
+    remote_src: yes
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Edit Yum File (CentOS)
+  become: yes
+  blockinfile:
+    path: /etc/yum.conf
+    marker: "# Managed by Ansible"
+    block: |
+      proxy=http://192.168.1.80:3142
+  when: ansible_facts['distribution']=="CentOS"

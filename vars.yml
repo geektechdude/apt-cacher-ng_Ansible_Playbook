@@ -1,0 +1,7 @@
+---
+# Variables for use with apt-cache-ng playbook
+
+# apt-cacher-ng configuration back-up location
+apt_back_up: /srv/backup_apt_cacher-ng/
+apt_back_up_file: /srv/backup_apt_cacher-ng/acng.conf
+

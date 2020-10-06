@@ -1,0 +1,101 @@
+---
+- name: Include variables
+  include_vars:
+    file: ../../vars.yml
+
+- name: Install EPEL (CentOS)
+  become: yes
+  yum:
+    name: epel-release
+    state: present
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Install apt-cacher-ng (CentOS)
+  become: yes
+  yum:
+    name: apt-cacher-ng
+    state: present
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Create Back Up Directory (CentOS)
+  become: yes
+  file:
+    path: "{{ apt_back_up }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy Original Configuration (CentOS)
+  become: yes
+  copy:
+    src: /etc/apt-cacher-ng/acng.conf
+    dest: "{{ apt_back_up_file }}"
+    remote_src: yes
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Create Repository URLS File (CentOS)
+  become: yes
+  file:
+    path: /etc/apt-cacher-ng/mirrors_centos
+    state: touch
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Fill Repository File (CentOS)
+  become: yes
+  blockinfile:
+    path: /etc/apt-cacher-ng/mirrors_centos
+    marker: "# Managed by Ansible"
+    block: |
+      http://mirror.centos.org/centos/$releasever/os/$basearch
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Adjust apt-cacher-ng Configuration (CentOS)
+  become: yes
+  blockinfile:
+    path: /etc/apt-cacher-ng/acng.conf
+    marker: "# Managed by Ansible"
+    block: |
+      Remap-centos: file:mirrors_centos /centos
+      VfilePatternEx: ^/\?release=[0-9]+&arch=
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Add in Systemd Service File (CentOS)
+  become: yes
+  file:
+    path: /etc/systemd/system/apt-cacher-ng.service
+    state: touch
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Configure Systemd Service File (CentOS)
+  become: yes
+  blockinfile:
+    path: /etc/systemd/system/apt-cacher-ng.service
+    marker: ""
+    block: |
+      [Unit]
+      Description=The apt-cacher-ng proxy server
+      After=syslog.target network.target remote-fs.target nss-lookup.target
+
+      [Service]
+      Type=forking
+      RuntimeDirectory= apt-cacher-ng
+      PIDFile =/var/run/apt-cacher-ng/pid
+      EnvironmentFile=-/etc/default/apt-cacher-ng
+      ExecStart=/usr/sbin/apt-cacher-ng $DAEMON_OPTS pidfile=/var/run/apt-cacher-ng/pid SocketPath=/var/run/apt-cacher-ng/socket foreground=0 $EXTRA_ACNG_OPTs
+      ExecReload=/bin/kill -s HUP $MAINPID
+      ExecStop=/bin/kill -s QUIT $MAINPID
+      PrivateTmp=true
+      User=apt-cacher-ng
+
+      [Install]
+      WantedBy=multi-user.target
+  when: ansible_facts['distribution']=="CentOS"
+
+- name: Start apt-cacher-ng
+  become: yes
+  service:
+    name: apt-cacher-ng
+    state: started
+    enabled: yes
+  when: ansible_facts['distribution']=="CentOS"
+
+
